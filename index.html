@@ -231,6 +231,14 @@
         </div>
       </div>
 
+      <div class="check">
+        <input type="checkbox" id="vibrate" aria-describedby="vibrate-hint" checked>
+        <div>
+          <label for="vibrate">Vibrer à la pause et à la reprise</label>
+          <p class="hint" id="vibrate-hint">Reprise&nbsp;: 1 vibration. Pause&nbsp;: 2 vibrations. Sur iPhone, vibration légère (iOS 18 ou plus récent).</p>
+        </div>
+      </div>
+
       <button type="button" class="secondary" id="test">Tester la voix</button>
     </section>
 
@@ -267,7 +275,7 @@
     try {
       localStorage.setItem(STORE, JSON.stringify({
         interval: intervalSec(), rate: rateSel.value, beep: beepChk.checked,
-        wake: wakeChk.checked, elapsed: elapsed()
+        wake: wakeChk.checked, vibrate: vibChk.checked, elapsed: elapsed()
       }));
     } catch (e) {}
   }
@@ -279,6 +287,7 @@
     if ([...rateSel.options].some(o => o.value === s.rate)) rateSel.value = s.rate;
     beepChk.checked = s.beep !== false;
     wakeChk.checked = !!s.wake;
+    vibChk.checked = s.vibrate !== false;
     if (s.elapsed > 0) {
       accumulated = s.elapsed;
       lastSlot = Math.floor(accumulated / (intervalSec() * 1000));
@@ -435,6 +444,7 @@
     if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
     updateMediaTitle();
     say(accumulated ? 'Reprise' : 'Départ');
+    haptic([200]);
     toggleBtn.textContent = 'Pause';
     resetBtn.disabled = true;
     clearInterval(loop);
@@ -450,6 +460,7 @@
     clearInterval(loop);
     keepAlive.pause();
     if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
+    haptic([120, 120, 120]);
     const msg = `Pause à ${spoken(Math.floor(accumulated / 1000))}`;
     say(msg);
     announce(msg + '.');
@@ -483,6 +494,31 @@
   wakeChk.addEventListener('change', () => { syncWakeLock(); save(); });
   window.addEventListener('pagehide', save);
 
+  // ---------- Vibrations ----------
+  // Android : API Vibration. iPhone (pas d'API Vibration) : cliquer le libellé d'un
+  // interrupteur natif <input switch> produit un retour haptique depuis iOS 18.
+  const vibChk = $('vibrate');
+  vibChk.addEventListener('change', save);
+  const hapticLabel = (() => {
+    const wrap = document.createElement('div');
+    wrap.className = 'visually-hidden';
+    wrap.setAttribute('aria-hidden', 'true');
+    wrap.innerHTML = '<input type="checkbox" switch id="haptic-switch" tabindex="-1"><label for="haptic-switch">.</label>';
+    document.body.appendChild(wrap);
+    return wrap.querySelector('label');
+  })();
+
+  // pattern : [vibration, silence, vibration, …] en ms
+  function haptic(pattern) {
+    if (!vibChk.checked) return;
+    if (typeof navigator.vibrate === 'function') { navigator.vibrate(pattern); return; }
+    let t = 0;
+    pattern.forEach((d, i) => {
+      if (i % 2 === 0) setTimeout(() => hapticLabel.click(), t);
+      t += d;
+    });
+  }
+
   // ---------- Secouer pour pause / reprise ----------
   const shakeChk = $('shake'), shakeHint = $('shake-hint');
   const SHAKE_DEFAULT_HINT = shakeHint.textContent;
@@ -500,7 +536,6 @@
     peaks = peaks.filter(t => now - t < 1200);
     if (peaks.length >= 4 && now - lastShake > 2000) {
       lastShake = now; peaks = [];
-      if (navigator.vibrate) navigator.vibrate(80);
       startEpoch === null ? start() : pause();
     }
   }
