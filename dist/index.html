@@ -232,7 +232,7 @@
       </div>
 
       <div class="check">
-        <input type="checkbox" id="shake" aria-describedby="shake-hint">
+        <input type="checkbox" id="shake" aria-describedby="shake-hint" checked>
         <div>
           <label for="shake">Secouer pour pause ou reprise</label>
           <p class="hint" id="shake-hint">Secouez fermement le téléphone 4 fois. Fonctionne seulement écran allumé. Désactivez pour la course&nbsp;: la foulée peut déclencher la pause.</p>
@@ -283,7 +283,7 @@
     try {
       localStorage.setItem(STORE, JSON.stringify({
         interval: intervalSec(), rate: rateSel.value, beep: beepChk.checked,
-        wake: wakeChk.checked, vibrate: vibChk.checked, elapsed: elapsed()
+        wake: wakeChk.checked, vibrate: vibChk.checked, shake: shakeChk.checked, elapsed: elapsed()
       }));
     } catch (e) {}
   }
@@ -296,6 +296,7 @@
     beepChk.checked = s.beep !== false;
     wakeChk.checked = !!s.wake;
     vibChk.checked = s.vibrate !== false;
+    shakeChk.checked = s.shake !== false;
     if (s.elapsed > 0) {
       accumulated = s.elapsed;
       lastSlot = Math.floor(accumulated / (intervalSec() * 1000));
@@ -548,28 +549,45 @@
     }
   }
 
-  function shakeFail(msg) {
+  // quiet : activation automatique au chargement, on n'annonce pas l'échec
+  function shakeFail(msg, quiet) {
     shakeChk.checked = false;
     window.removeEventListener('devicemotion', onMotion);
     shakeHint.textContent = msg;
-    announce(msg);
+    if (!quiet) announce(msg);
   }
 
-  async function enableShake() {
+  // Au chargement : les événements arrivent directement sur Android. Sur iPhone,
+  // l'autorisation exige un geste : on la demande au premier appui sur la page
+  // (en général « Démarrer »), sans fenêtre si elle a déjà été accordée.
+  function autoEnableShake() {
+    if (typeof DeviceMotionEvent === 'undefined') { shakeChk.checked = false; return; }
+    motionSeen = false;
+    window.addEventListener('devicemotion', onMotion);
+    if (typeof DeviceMotionEvent.requestPermission === 'function') {
+      const onFirstTap = () => {
+        document.removeEventListener('click', onFirstTap, true);
+        if (shakeChk.checked && !motionSeen) enableShake(true);
+      };
+      document.addEventListener('click', onFirstTap, true);
+    }
+  }
+
+  async function enableShake(quiet) {
     if (typeof DeviceMotionEvent === 'undefined') {
       return shakeFail('Ce navigateur ne donne pas accès aux mouvements du téléphone.');
     }
     if (typeof DeviceMotionEvent.requestPermission === 'function') { // iPhone : autorisation obligatoire
       let res = 'denied';
       try { res = await DeviceMotionEvent.requestPermission(); } catch (e) {}
-      if (res !== 'granted') return shakeFail('Accès aux mouvements refusé. Sur iPhone, rechargez la page puis réessayez et choisissez « Autoriser ».');
+      if (res !== 'granted') return shakeFail('Accès aux mouvements refusé. Sur iPhone, rechargez la page puis réessayez et choisissez « Autoriser ».', quiet);
     }
     motionSeen = false;
     window.addEventListener('devicemotion', onMotion);
     shakeHint.textContent = SHAKE_DEFAULT_HINT;
     setTimeout(() => {
       if (shakeChk.checked && !motionSeen) {
-        shakeFail('Le capteur de mouvement ne répond pas sur cette page. Utilisez la version hébergée du chrono, ouverte directement dans Safari ou Chrome.');
+        shakeFail('Le capteur de mouvement ne répond pas sur cette page. Utilisez la version hébergée du chrono, ouverte directement dans Safari ou Chrome.', quiet);
       }
     }, 2500);
   }
@@ -577,6 +595,7 @@
   shakeChk.addEventListener('change', () => {
     if (shakeChk.checked) enableShake();
     else { window.removeEventListener('devicemotion', onMotion); shakeHint.textContent = SHAKE_DEFAULT_HINT; }
+    save();
   });
 
   // ---------- Modale réglages ----------
@@ -587,6 +606,7 @@
   dlg.addEventListener('close', () => openBtn.focus());
 
   restore();
+  if (shakeChk.checked) autoEnableShake();
   if (accumulated) { toggleBtn.textContent = 'Reprendre'; resetBtn.disabled = false; }
   render();
 })();
