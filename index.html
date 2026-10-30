@@ -247,6 +247,14 @@
         </div>
       </div>
 
+      <div class="check" id="mix-row">
+        <input type="checkbox" id="mix" aria-describedby="mix-hint">
+        <div>
+          <label for="mix">Parler par-dessus les vidéos (expérimental)</label>
+          <p class="hint" id="mix-hint">Essaie de garder les annonces quand YouTube ou TF1+ jouent. iOS peut quand même mettre le chrono en veille écran verrouillé.</p>
+        </div>
+      </div>
+
       <button type="button" class="secondary" id="test">Tester la voix</button>
     </section>
 
@@ -270,7 +278,7 @@
   const timeEl = $('time'), nextEl = $('next'), barEl = $('bar'), statusEl = $('status');
   const intervalSel = $('interval');
   const toggleBtn = $('toggle'), resetBtn = $('reset'), testBtn = $('test');
-  const rateSel = $('rate'), beepChk = $('beep'), wakeChk = $('wakelock'), duckChk = $('duck');
+  const rateSel = $('rate'), beepChk = $('beep'), wakeChk = $('wakelock'), duckChk = $('duck'), mixChk = $('mix');
   const STORE = 'chrono-vocal-v1';
 
   let accumulated = 0;   // ms accumulées avant le dernier départ
@@ -283,7 +291,7 @@
     try {
       localStorage.setItem(STORE, JSON.stringify({
         interval: intervalSec(), rate: rateSel.value, beep: beepChk.checked,
-        wake: wakeChk.checked, vibrate: vibChk.checked, shake: shakeChk.checked, duck: duckChk.checked, elapsed: elapsed()
+        wake: wakeChk.checked, vibrate: vibChk.checked, shake: shakeChk.checked, duck: duckChk.checked, mix: mixChk.checked, elapsed: elapsed()
       }));
     } catch (e) {}
   }
@@ -298,6 +306,7 @@
     vibChk.checked = s.vibrate !== false;
     shakeChk.checked = s.shake !== false;
     duckChk.checked = s.duck !== false;
+    mixChk.checked = !!s.mix;
     if (s.elapsed > 0) {
       accumulated = s.elapsed;
       lastSlot = Math.floor(accumulated / (intervalSec() * 1000));
@@ -371,14 +380,19 @@
   // des autres apps pendant la synthèse vocale.
   const hasAudioSession = 'audioSession' in navigator;
   let speakId = 0;
-  function duckStart() {
-    if (!hasAudioSession || !duckChk.checked) return;
-    try { navigator.audioSession.type = 'transient-solo'; } catch (e) {}
-  }
-  function duckEnd() {
+  // Mode « mélange » : session « ambient », qui joue en même temps que les autres apps
+  // au lieu de leur céder la sortie audio. Pendant l'annonce, « transient » baisse
+  // les autres sons au lieu de les couper.
+  function setSession(type) {
     if (!hasAudioSession) return;
-    try { navigator.audioSession.type = 'auto'; } catch (e) {}
+    try { navigator.audioSession.type = type; } catch (e) {}
   }
+  const baseSession = () => (mixChk.checked ? 'ambient' : 'auto');
+  function duckStart() {
+    if (!duckChk.checked) return;
+    setSession(mixChk.checked ? 'transient' : 'transient-solo');
+  }
+  function duckEnd() { setSession(baseSession()); }
 
   function say(text) {
     const withBeep = beepChk.checked && intervalSec() !== 1; // pas de bip chaque seconde
@@ -460,7 +474,19 @@
       wakeLock = null;
     }
   }
-  document.addEventListener('visibilitychange', () => { syncWakeLock(); if (document.visibilityState === 'visible') tick(); });
+  document.addEventListener('visibilitychange', () => {
+    syncWakeLock();
+    if (document.visibilityState === 'visible') {
+      if (startEpoch !== null && keepAlive.paused) keepAlive.play().catch(() => {});
+      tick();
+    }
+  });
+  // Une autre app (vidéo) a coupé notre son de maintien : on tente de le relancer
+  keepAlive.addEventListener('pause', () => {
+    if (startEpoch !== null) setTimeout(() => {
+      if (startEpoch !== null && keepAlive.paused) keepAlive.play().catch(() => {});
+    }, 500);
+  });
 
   // ---------- États ----------
   function announce(msg) {
@@ -471,6 +497,7 @@
   function start() {
     startEpoch = Date.now();
     lastSlot = Math.floor(accumulated / (intervalSec() * 1000));
+    setSession(baseSession());
     keepAlive.play().catch(() => {});
     if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
     updateMediaTitle();
@@ -629,7 +656,16 @@
 
   // L'option n'existe que là où le navigateur la permet (Safari iPhone 16.4+)
   $('duck-row').hidden = !hasAudioSession;
+  $('mix-row').hidden = !hasAudioSession;
   duckChk.addEventListener('change', save);
+  mixChk.addEventListener('change', () => {
+    if (startEpoch !== null) {
+      setSession(baseSession());
+      keepAlive.pause(); // relance pour appliquer la nouvelle session
+      keepAlive.play().catch(() => {});
+    }
+    save();
+  });
 
   restore();
   if (shakeChk.checked) autoEnableShake();
