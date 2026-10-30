@@ -1,0 +1,560 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>Chrono vocal</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Mono:wght@500;700&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<style>
+  /* Layout : une colonne façon montre de sport — cadran géant, commandes au pouce, réglages en dessous */
+  :root {
+    --bg: #EEF3F5;
+    --surface: #FFFFFF;
+    --ink: #0D1B24;
+    --muted: #46576330;
+    --muted-ink: #44535E;
+    --line: #B9C7CF;
+    --accent: #00586B;
+    --accent-ink: #FFFFFF;
+    --focus: #A33F00;
+    --font-body: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-digits: "Atkinson Hyperlegible Mono", ui-monospace, "SF Mono", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0B1419; --surface: #142229; --ink: #E9F1F4; --muted: #9FB2BD30; --muted-ink: #A9BBC5;
+      --line: #2E434E; --accent: #6FD0E2; --accent-ink: #062027; --focus: #FFB067; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0B1419; --surface: #142229; --ink: #E9F1F4; --muted: #9FB2BD30; --muted-ink: #A9BBC5;
+    --line: #2E434E; --accent: #6FD0E2; --accent-ink: #062027; --focus: #FFB067; color-scheme: dark;
+  }
+
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 1.0625rem;
+    line-height: 1.5;
+  }
+  .app {
+    max-width: 34rem;
+    margin: 0 auto;
+    padding-block: 1.25rem 2.5rem;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    display: grid;
+    gap: 1.5rem;
+  }
+  h1 { font-size: 1.25rem; margin: 0; letter-spacing: .02em; }
+  h2 { font-size: 1.0625rem; margin: 0; }
+
+  .visually-hidden {
+    position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+
+  /* Cadran */
+  .dial {
+    background: var(--surface);
+    border: 2px solid var(--line);
+    border-radius: 1.25rem;
+    padding: 1.25rem 1rem 1rem;
+    display: grid;
+    gap: .25rem;
+    justify-items: center;
+    text-align: center;
+  }
+  .time {
+    font-family: var(--font-digits);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    font-size: clamp(3.5rem, 21vw, 7.5rem);
+    line-height: 1;
+    margin: 0;
+    letter-spacing: -.02em;
+  }
+  .time .tenths { font-size: .42em; color: var(--muted-ink); letter-spacing: 0; }
+  .next { margin: 0; color: var(--muted-ink); font-variant-numeric: tabular-nums; min-height: 1.5em; }
+  .progress {
+    width: 100%; height: .5rem; border-radius: 1rem; background: var(--muted); overflow: hidden;
+  }
+  .progress span { display: block; height: 100%; width: 0; background: var(--accent); border-radius: inherit; }
+
+  /* Commandes */
+  .controls { display: grid; grid-template-columns: 2fr 1fr; gap: .75rem; }
+  button {
+    font: inherit; font-weight: 700; cursor: pointer;
+    min-height: 3.5rem; border-radius: .875rem; padding: .5rem 1rem;
+    border: 2px solid var(--accent);
+  }
+  .primary { background: var(--accent); color: var(--accent-ink); font-size: 1.375rem; min-height: 4.5rem; }
+  .secondary { background: var(--surface); color: var(--ink); border-color: var(--line); }
+  .controls .secondary { min-height: 4.5rem; }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  :focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+
+  /* Réglages */
+  .settings { display: grid; gap: 1.25rem; }
+  fieldset { border: 0; margin: 0; padding: 0; display: grid; gap: .5rem; min-width: 0; }
+  legend { font-weight: 700; padding: 0; margin-bottom: .5rem; }
+  .segmented { display: grid; grid-template-columns: repeat(2, 1fr); gap: .5rem; }
+  .segmented label {
+    position: relative; display: flex; align-items: center; justify-content: center; gap: .5rem;
+    min-height: 3.25rem; padding: .5rem; border: 2px solid var(--line); border-radius: .875rem;
+    background: var(--surface); font-weight: 700; cursor: pointer;
+  }
+  .segmented input { width: 1.25rem; height: 1.25rem; accent-color: var(--accent); margin: 0; }
+  .segmented label:has(input:checked) { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  .segmented label:has(input:focus-visible) { outline: 3px solid var(--focus); outline-offset: 3px; }
+  .segmented input:focus-visible { outline: none; }
+
+  .field { display: grid; gap: .375rem; }
+  .field label { font-weight: 700; }
+  select {
+    font: inherit; min-height: 3rem; padding: .25rem .75rem; border-radius: .75rem;
+    border: 2px solid var(--line); background: var(--surface); color: var(--ink);
+  }
+  .big-select { min-height: 3.5rem; font-size: 1.125rem; font-weight: 700; padding-inline: 1rem; }
+  .check { display: flex; gap: .75rem; align-items: flex-start; }
+  .check input { width: 1.5rem; height: 1.5rem; margin: .1rem 0 0; accent-color: var(--accent); flex: none; }
+  .check label { font-weight: 700; }
+  .hint { margin: 0; color: var(--muted-ink); font-size: .9375rem; font-weight: 400; }
+
+  .notes { border-top: 2px solid var(--line); padding-top: 1.25rem; display: grid; gap: .5rem; }
+  .notes ul { margin: 0; padding-left: 1.25rem; display: grid; gap: .375rem; color: var(--muted-ink); }
+
+  /* En-tête + bouton réglages */
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+  .icon-btn {
+    display: inline-flex; align-items: center; gap: .5rem; min-height: 3rem;
+    background: var(--surface); color: var(--ink); border-color: var(--line); font-size: 1rem;
+  }
+  .icon-btn svg { width: 1.25rem; height: 1.25rem; flex: none; }
+
+  /* Modale réglages */
+  dialog {
+    width: min(34rem, calc(100% - 32px));
+    max-height: calc(100% - 32px);
+    padding: 0; border: 2px solid var(--line); border-radius: 1.25rem;
+    background: var(--surface); color: var(--ink);
+  }
+  dialog::backdrop { background: rgb(5 15 20 / .6); }
+  .dialog-inner { padding: 1.25rem; display: grid; gap: 1.25rem; }
+  .dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+  .dialog-head h2 { font-size: 1.25rem; }
+  .dialog-head button { min-height: 3rem; background: var(--surface); color: var(--ink); border-color: var(--line); }
+  dialog select, dialog .secondary { background: var(--bg); }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .progress span { transition: width .25s linear; }
+  }
+</style>
+
+<div class="app" lang="fr">
+  <header class="top">
+    <h1>Chrono vocal</h1>
+    <button type="button" class="icon-btn" id="open-settings" aria-haspopup="dialog">
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M19.4 13a7.6 7.6 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.5 7.5 0 0 0-1.7-1L15 3h-4l-.4 2.7c-.6.3-1.2.6-1.7 1l-2.5-1-2 3.5L6.6 11a7.6 7.6 0 0 0 0 2l-2.2 1.6 2 3.5 2.5-1c.5.4 1.1.7 1.7 1L11 21h4l.4-2.7c.6-.3 1.2-.6 1.7-1l2.5 1 2-3.5-2.2-1.6ZM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7Z" transform="translate(-1 0)"/></svg>
+      Réglages
+    </button>
+  </header>
+
+  <main class="settings" style="gap:1.5rem">
+    <section class="dial" aria-labelledby="dial-title">
+      <h2 id="dial-title" class="visually-hidden">Temps écoulé</h2>
+      <p class="time" id="time" role="timer" aria-live="off" aria-atomic="true">00:00<span class="tenths">,0</span></p>
+      <p class="next" id="next">Annonce toutes les 10 secondes</p>
+      <div class="progress" aria-hidden="true"><span id="bar"></span></div>
+    </section>
+
+    <div class="field">
+      <label for="interval">Annoncer le temps</label>
+      <select id="interval" class="big-select">
+        <option value="1">Chaque seconde</option>
+        <option value="10" selected>Toutes les 10 secondes</option>
+        <option value="30">Toutes les 30 secondes</option>
+        <option value="60">Chaque minute</option>
+        <option value="120">Toutes les 2 minutes</option>
+        <option value="300">Toutes les 5 minutes</option>
+      </select>
+    </div>
+
+    <div class="controls">
+      <button type="button" class="primary" id="toggle">Démarrer</button>
+      <button type="button" class="secondary" id="reset" disabled>Remettre à zéro</button>
+    </div>
+
+    <p id="status" role="status" class="visually-hidden"></p>
+  </main>
+</div>
+
+<dialog id="settings" aria-labelledby="settings-title" lang="fr">
+  <div class="dialog-inner">
+    <div class="dialog-head">
+      <h2 id="settings-title">Réglages</h2>
+      <button type="button" id="close-settings">Fermer</button>
+    </div>
+
+    <section class="settings" aria-label="Voix et écran">
+      <div class="field">
+        <label for="rate">Vitesse de la voix</label>
+        <select id="rate">
+          <option value="0.85">Lente</option>
+          <option value="1" selected>Normale</option>
+          <option value="1.2">Rapide</option>
+          <option value="1.4">Très rapide</option>
+        </select>
+      </div>
+
+      <div class="check">
+        <input type="checkbox" id="beep" checked>
+        <div>
+          <label for="beep">Bip avant l’annonce</label>
+          <p class="hint" id="beep-hint">Un court signal sonore attire l’attention avant la voix.</p>
+        </div>
+      </div>
+
+      <div class="check">
+        <input type="checkbox" id="wakelock" aria-describedby="wakelock-hint">
+        <div>
+          <label for="wakelock">Garder l’écran allumé</label>
+          <p class="hint" id="wakelock-hint">Le plus fiable pendant une séance. Consomme plus de batterie.</p>
+        </div>
+      </div>
+
+      <div class="check">
+        <input type="checkbox" id="shake" aria-describedby="shake-hint">
+        <div>
+          <label for="shake">Secouer pour pause ou reprise</label>
+          <p class="hint" id="shake-hint">Secouez fermement le téléphone 4 fois. Fonctionne seulement écran allumé. Désactivez pour la course&nbsp;: la foulée peut déclencher la pause.</p>
+        </div>
+      </div>
+
+      <button type="button" class="secondary" id="test">Tester la voix</button>
+    </section>
+
+    <section class="notes" aria-labelledby="notes-title">
+      <h2 id="notes-title">Utilisation en arrière-plan</h2>
+      <ul>
+        <li>Au démarrage, le chrono lance un son quasi inaudible qui garde la page active quand l’écran se verrouille ou quand vous changez d’application.</li>
+        <li>Vous pouvez mettre en pause ou relancer depuis les commandes média de l’écran verrouillé.</li>
+        <li>Le temps reste exact même si le téléphone ralentit la page&nbsp;: il est calculé à partir de l’heure de départ.</li>
+        <li>Désactivez le mode économie d’énergie pendant la séance. Sur iPhone, gardez l’écran allumé si les annonces s’arrêtent écran verrouillé.</li>
+      </ul>
+    </section>
+  </div>
+</dialog>
+
+<script>
+(() => {
+  document.documentElement.lang = 'fr';
+
+  const $ = (id) => document.getElementById(id);
+  const timeEl = $('time'), nextEl = $('next'), barEl = $('bar'), statusEl = $('status');
+  const intervalSel = $('interval');
+  const toggleBtn = $('toggle'), resetBtn = $('reset'), testBtn = $('test');
+  const rateSel = $('rate'), beepChk = $('beep'), wakeChk = $('wakelock');
+  const STORE = 'chrono-vocal-v1';
+
+  let accumulated = 0;   // ms accumulées avant le dernier départ
+  let startEpoch = null; // Date.now() au dernier départ, null si en pause
+  let lastSlot = 0;      // dernier palier annoncé
+  let loop = null;
+
+  // ---------- Persistance (confort uniquement) ----------
+  function save() {
+    try {
+      localStorage.setItem(STORE, JSON.stringify({
+        interval: intervalSec(), rate: rateSel.value, beep: beepChk.checked,
+        wake: wakeChk.checked, elapsed: elapsed()
+      }));
+    } catch (e) {}
+  }
+  function restore() {
+    let s = null;
+    try { s = JSON.parse(localStorage.getItem(STORE) || 'null'); } catch (e) {}
+    if (!s) return;
+    if ([...intervalSel.options].some(o => o.value === String(s.interval))) intervalSel.value = String(s.interval);
+    if ([...rateSel.options].some(o => o.value === s.rate)) rateSel.value = s.rate;
+    beepChk.checked = s.beep !== false;
+    wakeChk.checked = !!s.wake;
+    if (s.elapsed > 0) {
+      accumulated = s.elapsed;
+      lastSlot = Math.floor(accumulated / (intervalSec() * 1000));
+      announce(`Chrono récupéré en pause à ${spoken(Math.floor(accumulated / 1000))}.`);
+    }
+  }
+
+  // ---------- Temps ----------
+  const intervalSec = () => Number(intervalSel.value);
+  const elapsed = () => accumulated + (startEpoch !== null ? Date.now() - startEpoch : 0);
+  const pad = (n) => String(n).padStart(2, '0');
+  const intervalLabel = () => ({
+    1: 'Annonce chaque seconde', 10: 'Annonce toutes les 10 secondes', 30: 'Annonce toutes les 30 secondes',
+    60: 'Annonce chaque minute', 120: 'Annonce toutes les 2 minutes', 300: 'Annonce toutes les 5 minutes'
+  })[intervalSec()];
+
+  function spoken(totalSec) {
+    const h = Math.floor(totalSec / 3600), m = Math.floor((totalSec % 3600) / 60), s = totalSec % 60;
+    const parts = [];
+    if (h) parts.push(`${h} heure${h > 1 ? 's' : ''}`);
+    if (m) parts.push(`${m} minute${m > 1 ? 's' : ''}`);
+    if (s) parts.push((h || m) ? String(s) : `${s} seconde${s > 1 ? 's' : ''}`);
+    return parts.join(' ') || '0 seconde';
+  }
+
+  function render() {
+    const ms = elapsed();
+    const t = Math.floor(ms / 1000);
+    const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), s = t % 60;
+    const main = h ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
+    timeEl.innerHTML = `${main}<span class="tenths" aria-hidden="true">,${Math.floor((ms % 1000) / 100)}</span>`;
+
+    const iv = intervalSec() * 1000;
+    const left = Math.ceil((iv - (ms % iv)) / 1000);
+    const leftTxt = left >= 60 ? `${Math.floor(left / 60)} min ${pad(left % 60)} s` : `${left} s`;
+    if (startEpoch !== null) nextEl.textContent = `Prochaine annonce dans ${leftTxt}`;
+    else nextEl.textContent = intervalLabel();
+    barEl.style.width = `${((ms % iv) / iv) * 100}%`;
+  }
+
+  function tick() {
+    render();
+    if (startEpoch === null) return;
+    const slot = Math.floor(elapsed() / (intervalSec() * 1000));
+    if (slot > lastSlot) {
+      lastSlot = slot; // si la page a été ralentie, on annonce seulement le palier courant
+      const sec = slot * intervalSec();
+      // Chaque seconde : on dit seulement le chiffre des secondes pour tenir dans la seconde,
+      // et le temps complet à chaque minute pleine.
+      say(intervalSec() === 1 && sec % 60 !== 0 ? String(sec % 60) : spoken(sec));
+      updateMediaTitle();
+    }
+  }
+
+  // ---------- Voix ----------
+  let frVoice = null;
+  function pickVoice() {
+    const voices = window.speechSynthesis ? speechSynthesis.getVoices() : [];
+    frVoice = voices.find(v => v.lang === 'fr-FR' && v.localService)
+           || voices.find(v => v.lang && v.lang.startsWith('fr')) || null;
+  }
+  if (window.speechSynthesis) {
+    pickVoice();
+    speechSynthesis.addEventListener?.('voiceschanged', pickVoice);
+  }
+
+  function say(text) {
+    const withBeep = beepChk.checked && intervalSec() !== 1; // pas de bip chaque seconde
+    if (withBeep) beep();
+    if (!window.speechSynthesis) { announce(text); return; }
+    speechSynthesis.cancel(); // pas de file d'attente : toujours le temps actuel
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'fr-FR';
+    if (frVoice) u.voice = frVoice;
+    u.rate = Number(rateSel.value);
+    setTimeout(() => speechSynthesis.speak(u), withBeep ? 180 : 0);
+  }
+
+  // ---------- Audio : bip + maintien en arrière-plan ----------
+  let actx = null;
+  function beep() {
+    try {
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      if (actx.state === 'suspended') actx.resume();
+      const o = actx.createOscillator(), g = actx.createGain();
+      o.frequency.value = 880;
+      g.gain.setValueAtTime(0.0001, actx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.4, actx.currentTime + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + 0.15);
+      o.connect(g).connect(actx.destination);
+      o.start(); o.stop(actx.currentTime + 0.16);
+    } catch (e) {}
+  }
+
+  // Boucle de 2 s de bruit très faible (≈ -60 dBFS) : le navigateur considère la page
+  // comme « en lecture audio » et ne la gèle pas quand elle passe en arrière-plan.
+  const keepAlive = (() => {
+    const rate = 8000, n = rate * 2, buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+    const w = (o, s) => [...s].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
+    w(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); w(8, 'WAVE'); w(12, 'fmt ');
+    v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true);
+    v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, n * 2, true);
+    for (let i = 0; i < n; i++) v.setInt16(44 + i * 2, Math.round((Math.random() * 2 - 1) * 33), true);
+    const a = new Audio(URL.createObjectURL(new Blob([buf], { type: 'audio/wav' })));
+    a.loop = true;
+    a.setAttribute('playsinline', '');
+    return a;
+  })();
+
+  // ---------- Commandes média (écran verrouillé) ----------
+  function updateMediaTitle() {
+    if (!('mediaSession' in navigator)) return;
+    try {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: `Chrono vocal · ${spoken(Math.floor(elapsed() / 1000))}`,
+        artist: intervalLabel()
+      });
+    } catch (e) {}
+  }
+  if ('mediaSession' in navigator) {
+    const set = (a, fn) => { try { navigator.mediaSession.setActionHandler(a, fn); } catch (e) {} };
+    set('play', () => { if (startEpoch === null) start(); });
+    set('pause', () => { if (startEpoch !== null) pause(); });
+    set('stop', () => { if (startEpoch !== null) pause(); });
+  }
+
+  // ---------- Écran allumé ----------
+  let wakeLock = null;
+  async function syncWakeLock() {
+    const want = wakeChk.checked && startEpoch !== null && document.visibilityState === 'visible';
+    if (want && !wakeLock && 'wakeLock' in navigator) {
+      try {
+        wakeLock = await navigator.wakeLock.request('screen');
+        wakeLock.addEventListener('release', () => { wakeLock = null; });
+      } catch (e) { wakeLock = null; }
+    } else if (!want && wakeLock) {
+      try { await wakeLock.release(); } catch (e) {}
+      wakeLock = null;
+    }
+  }
+  document.addEventListener('visibilitychange', () => { syncWakeLock(); if (document.visibilityState === 'visible') tick(); });
+
+  // ---------- États ----------
+  function announce(msg) {
+    statusEl.textContent = '';
+    setTimeout(() => { statusEl.textContent = msg; }, 50);
+  }
+
+  function start() {
+    startEpoch = Date.now();
+    lastSlot = Math.floor(accumulated / (intervalSec() * 1000));
+    keepAlive.play().catch(() => {});
+    if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
+    updateMediaTitle();
+    say(accumulated ? 'Reprise' : 'Départ');
+    toggleBtn.textContent = 'Pause';
+    resetBtn.disabled = true;
+    clearInterval(loop);
+    loop = setInterval(tick, 100);
+    syncWakeLock();
+    save();
+    tick();
+  }
+
+  function pause() {
+    accumulated = elapsed();
+    startEpoch = null;
+    clearInterval(loop);
+    keepAlive.pause();
+    if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
+    const msg = `Pause à ${spoken(Math.floor(accumulated / 1000))}`;
+    say(msg);
+    announce(msg + '.');
+    toggleBtn.textContent = 'Reprendre';
+    resetBtn.disabled = false;
+    syncWakeLock();
+    save();
+    render();
+  }
+
+  function reset() {
+    accumulated = 0; lastSlot = 0; startEpoch = null;
+    if (window.speechSynthesis) speechSynthesis.cancel();
+    toggleBtn.textContent = 'Démarrer';
+    resetBtn.disabled = true;
+    announce('Chrono remis à zéro.');
+    save();
+    render();
+    toggleBtn.focus();
+  }
+
+  toggleBtn.addEventListener('click', () => (startEpoch === null ? start() : pause()));
+  resetBtn.addEventListener('click', reset);
+  testBtn.addEventListener('click', () => say('1 minute 30'));
+  intervalSel.addEventListener('change', () => {
+    lastSlot = Math.floor(elapsed() / (intervalSec() * 1000));
+    updateMediaTitle(); save(); render();
+  });
+  rateSel.addEventListener('change', save);
+  beepChk.addEventListener('change', save);
+  wakeChk.addEventListener('change', () => { syncWakeLock(); save(); });
+  window.addEventListener('pagehide', save);
+
+  // ---------- Secouer pour pause / reprise ----------
+  const shakeChk = $('shake'), shakeHint = $('shake-hint');
+  const SHAKE_DEFAULT_HINT = shakeHint.textContent;
+  let peaks = [], lastShake = 0, motionSeen = false;
+
+  function onMotion(e) {
+    motionSeen = true;
+    const a = e.acceleration, g = e.accelerationIncludingGravity;
+    let mag;
+    if (a && a.x != null) mag = Math.hypot(a.x, a.y, a.z);
+    else if (g && g.x != null) mag = Math.abs(Math.hypot(g.x, g.y, g.z) - 9.81);
+    else return;
+    const now = Date.now();
+    if (mag > 28 && (!peaks.length || now - peaks[peaks.length - 1] > 100)) peaks.push(now);
+    peaks = peaks.filter(t => now - t < 1200);
+    if (peaks.length >= 4 && now - lastShake > 2000) {
+      lastShake = now; peaks = [];
+      if (navigator.vibrate) navigator.vibrate(80);
+      startEpoch === null ? start() : pause();
+    }
+  }
+
+  function shakeFail(msg) {
+    shakeChk.checked = false;
+    window.removeEventListener('devicemotion', onMotion);
+    shakeHint.textContent = msg;
+    announce(msg);
+  }
+
+  async function enableShake() {
+    if (typeof DeviceMotionEvent === 'undefined') {
+      return shakeFail('Ce navigateur ne donne pas accès aux mouvements du téléphone.');
+    }
+    if (typeof DeviceMotionEvent.requestPermission === 'function') { // iPhone : autorisation obligatoire
+      let res = 'denied';
+      try { res = await DeviceMotionEvent.requestPermission(); } catch (e) {}
+      if (res !== 'granted') return shakeFail('Accès aux mouvements refusé. Sur iPhone, rechargez la page puis réessayez et choisissez « Autoriser ».');
+    }
+    motionSeen = false;
+    window.addEventListener('devicemotion', onMotion);
+    shakeHint.textContent = SHAKE_DEFAULT_HINT;
+    setTimeout(() => {
+      if (shakeChk.checked && !motionSeen) {
+        shakeFail('Le capteur de mouvement ne répond pas sur cette page. Utilisez la version hébergée du chrono, ouverte directement dans Safari ou Chrome.');
+      }
+    }, 2500);
+  }
+
+  shakeChk.addEventListener('change', () => {
+    if (shakeChk.checked) enableShake();
+    else { window.removeEventListener('devicemotion', onMotion); shakeHint.textContent = SHAKE_DEFAULT_HINT; }
+  });
+
+  // ---------- Modale réglages ----------
+  const dlg = $('settings'), openBtn = $('open-settings');
+  openBtn.addEventListener('click', () => { dlg.showModal(); $('close-settings').focus(); });
+  $('close-settings').addEventListener('click', () => dlg.close());
+  dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); }); // clic sur le fond
+  dlg.addEventListener('close', () => openBtn.focus());
+
+  restore();
+  if (accumulated) { toggleBtn.textContent = 'Reprendre'; resetBtn.disabled = false; }
+  render();
+})();
+</script>
+</body>
+</html>
