@@ -239,6 +239,14 @@
         </div>
       </div>
 
+      <div class="check" id="duck-row">
+        <input type="checkbox" id="duck" aria-describedby="duck-hint" checked>
+        <div>
+          <label for="duck">Couper la musique pendant l’annonce</label>
+          <p class="hint" id="duck-hint">Met en pause la musique ou la vidéo d’une autre app le temps de l’annonce, puis la laisse reprendre. La reprise dépend de l’app : Musique et Spotify reprennent en général, certaines apps vidéo non.</p>
+        </div>
+      </div>
+
       <button type="button" class="secondary" id="test">Tester la voix</button>
     </section>
 
@@ -262,7 +270,7 @@
   const timeEl = $('time'), nextEl = $('next'), barEl = $('bar'), statusEl = $('status');
   const intervalSel = $('interval');
   const toggleBtn = $('toggle'), resetBtn = $('reset'), testBtn = $('test');
-  const rateSel = $('rate'), beepChk = $('beep'), wakeChk = $('wakelock');
+  const rateSel = $('rate'), beepChk = $('beep'), wakeChk = $('wakelock'), duckChk = $('duck');
   const STORE = 'chrono-vocal-v1';
 
   let accumulated = 0;   // ms accumulées avant le dernier départ
@@ -275,7 +283,7 @@
     try {
       localStorage.setItem(STORE, JSON.stringify({
         interval: intervalSec(), rate: rateSel.value, beep: beepChk.checked,
-        wake: wakeChk.checked, vibrate: vibChk.checked, shake: shakeChk.checked, elapsed: elapsed()
+        wake: wakeChk.checked, vibrate: vibChk.checked, shake: shakeChk.checked, duck: duckChk.checked, elapsed: elapsed()
       }));
     } catch (e) {}
   }
@@ -289,6 +297,7 @@
     wakeChk.checked = !!s.wake;
     vibChk.checked = s.vibrate !== false;
     shakeChk.checked = s.shake !== false;
+    duckChk.checked = s.duck !== false;
     if (s.elapsed > 0) {
       accumulated = s.elapsed;
       lastSlot = Math.floor(accumulated / (intervalSec() * 1000));
@@ -355,12 +364,31 @@
     speechSynthesis.addEventListener?.('voiceschanged', pickVoice);
   }
 
+  // ---------- Couper les autres sons pendant l'annonce ----------
+  // API Audio Session (Safari 16.4+) : « transient-solo » demande à iOS de mettre en pause
+  // les autres apps pendant un son court ; en revenant à « auto », iOS leur signale
+  // qu'elles peuvent reprendre. Ailleurs (Android), le système baisse déjà le son
+  // des autres apps pendant la synthèse vocale.
+  const hasAudioSession = 'audioSession' in navigator;
+  let speakId = 0;
+  function duckStart() {
+    if (!hasAudioSession || !duckChk.checked) return;
+    try { navigator.audioSession.type = 'transient-solo'; } catch (e) {}
+  }
+  function duckEnd() {
+    if (!hasAudioSession) return;
+    try { navigator.audioSession.type = 'auto'; } catch (e) {}
+  }
+
   function say(text) {
     const withBeep = beepChk.checked && intervalSec() !== 1; // pas de bip chaque seconde
     if (withBeep) beep();
     if (!window.speechSynthesis) { announce(text); return; }
     speechSynthesis.cancel(); // pas de file d'attente : toujours le temps actuel
     const u = new SpeechSynthesisUtterance(text);
+    const id = ++speakId;
+    duckStart();
+    u.onend = u.onerror = () => { if (id === speakId) duckEnd(); };
     u.lang = 'fr-FR';
     if (frVoice) u.voice = frVoice;
     u.rate = Number(rateSel.value);
@@ -383,8 +411,10 @@
     } catch (e) {}
   }
 
-  // Boucle de 2 s de bruit très faible (≈ -60 dBFS) : le navigateur considère la page
-  // comme « en lecture audio » et ne la gèle pas quand elle passe en arrière-plan.
+  // Boucle de 2 s d'une sinusoïde à 30 Hz très faible (≈ -64 dBFS) : le navigateur considère
+  // la page comme « en lecture audio » et ne la gèle pas en arrière-plan. Une fréquence aussi
+  // grave est inaudible à ce niveau (un bruit blanc s'entendait comme un souffle).
+  // 30 Hz × 2 s = 60 périodes entières : la boucle se raccorde sans clic.
   const keepAlive = (() => {
     const rate = 8000, n = rate * 2, buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
     const w = (o, s) => [...s].forEach((c, i) => v.setUint8(o + i, c.charCodeAt(0)));
@@ -392,7 +422,7 @@
     v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
     v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true);
     v.setUint16(34, 16, true); w(36, 'data'); v.setUint32(40, n * 2, true);
-    for (let i = 0; i < n; i++) v.setInt16(44 + i * 2, Math.round((Math.random() * 2 - 1) * 33), true);
+    for (let i = 0; i < n; i++) v.setInt16(44 + i * 2, Math.round(Math.sin(2 * Math.PI * 30 * i / rate) * 20), true);
     const a = new Audio(URL.createObjectURL(new Blob([buf], { type: 'audio/wav' })));
     a.loop = true;
     a.setAttribute('playsinline', '');
@@ -596,6 +626,10 @@
   $('close-settings').addEventListener('click', () => dlg.close());
   dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); }); // clic sur le fond
   dlg.addEventListener('close', () => openBtn.focus());
+
+  // L'option n'existe que là où le navigateur la permet (Safari iPhone 16.4+)
+  $('duck-row').hidden = !hasAudioSession;
+  duckChk.addEventListener('change', save);
 
   restore();
   if (shakeChk.checked) autoEnableShake();
